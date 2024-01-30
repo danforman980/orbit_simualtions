@@ -1,0 +1,112 @@
+import numpy as np 
+import matplotlib.pyplot as plt
+
+#intial conditions
+M = 1.989e30
+G = 6.67e-11/((1.498e11)**3)
+ri = 5.2e12/(1.498e11)
+thetai = 0
+vi = 0
+
+#starting angular velocity
+ai = (880/((1.498e11)))/ri
+ti = 0
+tmax = 40000000000
+h = 500000000 
+
+#arrays for time and the co-ordinates of the planet
+theta = []
+r = []
+t = []
+y = []
+x = []
+
+#radial acceleration
+def dv(r, a):
+    dv = (r*a**2) - G*M/r**2
+    return dv
+    
+#tangential acceleration
+def da(r, a, v):
+    da = -(2*a*v)/r
+    return da
+
+#individual rkstep
+def rkstep(ri, vi, ai, h):
+    
+    kd1 = h*dv(ri, ai)
+    ka1 = h*da(ri, ai, vi)
+    kr1 = h*vi
+    kt1 = h*ai 
+    
+    return kd1, ka1, kr1, kt1
+
+#rk program with 4 rksteps
+def rk4(ri, vi, ai, h, thetai):
+    
+    kd1, ka1, kr1, kt1 = rkstep(ri, vi, ai, h)
+
+    kd2, ka2, kr2, kt2 = rkstep(ri + 0.5*kr1, vi + 0.5*kd1, ai + 0.5*ka1, h)
+
+    kd3, ka3, kr3, kt3 = rkstep(ri + 0.5*kr2, vi + 0.5*kd2, ai + 0.5*ka2, h)
+
+    kd4, ka4, kr4, kt4 = rkstep(ri + kr3, vi + kd3, ai + ka3, h)
+
+    rh = ri + (1/6)*(kr1 + 2*kr2 + 2*kr3 + kr4)
+    theta = thetai + (1/6)*(kt1 + 2*kt2 + 2*kt3 + kt4)
+    dv = vi + (1/6)*(kd1 + 2*kd2 + 2*kd3 + kd4)
+    da = ai + (1/6)*(ka1 + 2*ka2 + 2*ka3 + ka4)
+    
+    return rh, theta, dv, da
+
+#function to work out the orbit of the body
+def orbit(ri, thetai, vi, ai, ti, tmax, h):
+    
+    #rkstep with size 2h
+    r_2h, theta_2h, dv_2h, da_2h, = rk4(ri, vi, ai, 2*h, thetai)
+
+    #2 rksteps with size h
+    rh1, theta1, dv1, da1, = rk4(ri, vi, ai, h, thetai)
+    rh2, theta2, dv2, da2, = rk4(ri, vi, ai, h, thetai)
+    
+    #intial error of the rk
+    errorr = (1/30)*np.abs((rh2 - r_2h))
+    #while loop so rk4 iterates until tmax
+    while ti<tmax:
+        
+        y.append(ri * np.sin(thetai))
+        x.append(ri * np.cos(thetai))
+        t.append(ti)
+        r.append(ri)
+        theta.append(thetai)
+        error = errorr
+        
+        #loop to adjust error if it is either too large or too small
+        while error > 0.001 or error < 0.0001:
+            
+            #error of the rk
+            r_2h, theta_2h, dv_2h, da_2h, = rk4(ri, vi, ai, 2*h, thetai)
+       
+            rh1, theta1, dv1, da1, = rk4(ri, vi, ai, h, thetai)
+            rh2, theta2, dv2, da2, = rk4(ri, vi, ai, h, thetai)
+             
+            error = (1/30)*np.abs((rh2 - r_2h))
+            
+            #adjusting the error based on whether it is too small or too large
+            
+            if error > 0.001:
+                h = h*0.66
+            elif error < 0.0001:
+                h = h*1.5
+           
+        #rk4 step once error is within range
+        ri, thetai, vi, ai, = rk4(ri, vi, ai, h, thetai)
+
+        ti = ti + h
+    #visual output
+    plt.plot(x, y)
+    plt.xlabel("x/ au")
+    plt.ylabel("y/ au")
+    return plt.show
+
+orbit(ri, thetai, vi, ai, ti, tmax, h)
